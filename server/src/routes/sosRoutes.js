@@ -1,0 +1,12 @@
+import express from 'express';
+import { createDemo, createSos, listAlerts, simulateLocation, updateLocation, updateStatus } from '../controllers/sosController.js';
+import { addClient } from '../utils/events.js';
+const router = express.Router();
+router.get('/', listAlerts);
+router.get('/events', (req,res) => { res.set({ 'Content-Type':'text/event-stream','Cache-Control':'no-cache','Connection':'keep-alive','X-Accel-Buffering':'no' }); res.flushHeaders?.(); res.write(`event: ready\ndata: {}\n\n`); addClient(res); });
+router.post('/', createSos);
+router.post('/demo', createDemo);
+router.patch('/:sosId/location', updateLocation);
+router.post('/:sosId/simulate', simulateLocation);
+router.patch('/:sosId/status', updateStatus);
+export default router;

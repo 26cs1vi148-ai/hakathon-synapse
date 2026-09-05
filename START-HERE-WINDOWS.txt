@@ -1,0 +1,14 @@
+CAMPUS SOS - WINDOWS QUICK START
+
+1. Open this folder in VS Code.
+2. Terminal -> New Terminal.
+3. Run:
+   cd client
+   npm.cmd install --legacy-peer-deps
+   npm.cmd run dev
+4. Open http://localhost:5173/
+
+Keep the terminal open while the website is running.
+
+Security dashboard: http://localhost:5173/security
+Demo page: http://localhost:5173/demo

@@ -1,0 +1,8 @@
+import { CheckCircle, MapPin, Phone, Radio } from 'lucide-react';
+import StatusBadge from './StatusBadge';
+import MapView from './MapView';
+export default function SosCard({alert,onRespond,onResolve}){
+  const age=Math.max(0,Date.now()-new Date(alert.createdAt).getTime()); const mins=Math.floor(age/60000); const secs=Math.floor((age%60000)/1000);
+  const maps=`https://www.google.com/maps?q=${alert.latitude},${alert.longitude}`;
+  return <article className="alert-card"><div className="alert-head"><div><div className="eyebrow"><Radio size={15}/> EMERGENCY ALERT</div><h3>{alert.name}</h3><p>{alert.studentId} · {alert.hostel} · Room {alert.room}</p></div><StatusBadge status={alert.status}/></div><div className="alert-grid"><div><small>Time</small><b>{new Date(alert.createdAt).toLocaleString()}</b></div><div><small>Active for</small><b>{mins}m {secs}s</b></div><div><small>Coordinates</small><b>{Number(alert.latitude).toFixed(5)}, {Number(alert.longitude).toFixed(5)}</b></div><div><small>Accuracy</small><b>{alert.accuracy ? `±${Math.round(alert.accuracy)}m` : '—'}</b></div></div><div className="map-wrap"><MapView latitude={Number(alert.latitude)} longitude={Number(alert.longitude)} name={alert.name}/></div><div className="actions"><a className="btn btn-blue" href={maps} target="_blank" rel="noreferrer"><MapPin size={16}/> View location</a>{alert.phone&&<a className="btn btn-dark" href={`tel:${alert.phone}`}><Phone size={16}/> Call student</a>}{alert.status==='ACTIVE'&&<button className="btn btn-amber" onClick={()=>onRespond(alert.id)}>Mark responded</button>}{alert.status!=='RESOLVED'&&<button className="btn btn-green" onClick={()=>onResolve(alert.id)}><CheckCircle size={16}/> Resolve</button>}</div></article>;
+}
