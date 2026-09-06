@@ -96,6 +96,7 @@ const startRingtone = () => {
   if (!AudioContext) return;
 
   const ctx = new AudioContext();
+  ctx.resume();
   const gain = ctx.createGain();
 
   gain.gain.value = 0.12;
