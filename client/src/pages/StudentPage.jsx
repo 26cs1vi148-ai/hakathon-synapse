@@ -13,23 +13,21 @@ import {
   VolumeX,
 } from 'lucide-react';
 
-import { createSos, updateLocation, updateStatus } from '../services/api';
+import {
+  createSos,
+  updateLocation,
+  updateStatus,
+  getAlerts,
+  registerHeartbeat,
+  getMyStudent,
+} from '../services/api';
+
 import { getCurrentLocation } from '../services/geolocation';
 import { buildWhatsAppUrl } from '../services/whatsapp';
 
-const initial = {
-  name: 'Rahul Sharma',
-  studentId: 'STU1024',
-  hostel: 'Boys Hostel',
-  room: 'B-204',
-  phone: '919876543210',
-};
-
 export default function StudentPage() {
-  const [student, setStudent] = useState(
-    () =>
-      JSON.parse(localStorage.getItem('campusStudent') || 'null') || initial
-  );
+  const [student, setStudent] = useState(null);
+  const [studentLoading, setStudentLoading] = useState(true);
 
   const [status, setStatus] = useState('READY');
   const [alert, setAlert] = useState(null);
@@ -45,10 +43,67 @@ export default function StudentPage() {
   const ringtoneRef = useRef(null);
   const lastRef = useRef(0);
 
+  // Load the logged-in student's real profile
   useEffect(() => {
-    localStorage.setItem('campusStudent', JSON.stringify(student));
-  }, [student]);
+    const loadMyProfile = async () => {
+      try {
+        setStudentLoading(true);
 
+        const result = await getMyStudent();
+        const profile = result?.student || result;
+
+        if (!profile) {
+          throw new Error('Student profile not found.');
+        }
+
+        setStudent(profile);
+      } catch (error) {
+        console.error('Could not load student profile:', error);
+
+        setMessage(
+          error.message || 'Could not load your student profile.'
+        );
+      } finally {
+        setStudentLoading(false);
+      }
+    };
+
+    loadMyProfile();
+  }, []);
+
+  // Restore active SOS
+  useEffect(() => {
+    if (!student?.studentId) return;
+
+    const loadActiveSos = async () => {
+      try {
+        const alerts = await getAlerts();
+
+        const active = alerts.find(
+          (a) =>
+            a.studentId === student.studentId &&
+            ['ACTIVE', 'ATTENDING', 'RESPONDED'].includes(a.status)
+        );
+
+        if (active) {
+          setAlert(active);
+          setStatus(active.status);
+
+          setLocation({
+            latitude: active.latitude,
+            longitude: active.longitude,
+            accuracy: active.accuracy,
+          });
+        }
+      } catch (e) {
+        console.warn('Could not restore active SOS:', e);
+      }
+    };
+
+    loadActiveSos();
+  }, [student?.studentId]);
+
+  // Cleanup GPS and ringtone
   useEffect(() => {
     return () => {
       if (watchRef.current !== null) {
@@ -61,15 +116,37 @@ export default function StudentPage() {
     };
   }, []);
 
+  // Student heartbeat
+  useEffect(() => {
+    if (!student?.studentId) return;
+
+    const ping = () =>
+      registerHeartbeat(student).catch((e) =>
+        console.warn('Heartbeat failed:', e)
+      );
+
+    ping();
+
+    const id = setInterval(ping, 30_000);
+
+    return () => clearInterval(id);
+  }, [student?.studentId]);
+
+  // =========================
+  // FAKE CAMPUS CALL
+  // =========================
+
   const startFakeCall = () => {
     setFakeCall(true);
     setCallConnected(false);
     setCallMuted(false);
+    startRingtone();
   };
 
   const declineFakeCall = () => {
     setFakeCall(false);
     setCallConnected(false);
+    stopRingtone();
 
     if (ringtoneRef.current) {
       ringtoneRef.current.pause();
@@ -79,6 +156,7 @@ export default function StudentPage() {
 
   const acceptFakeCall = () => {
     setCallConnected(true);
+    stopRingtone();
 
     if (ringtoneRef.current) {
       ringtoneRef.current.pause();
@@ -89,51 +167,64 @@ export default function StudentPage() {
   const toggleMute = () => {
     setCallMuted((value) => !value);
   };
-const startRingtone = () => {
-  if (ringtoneRef.current) return;
 
-  const AudioContext = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContext) return;
+  const startRingtone = () => {
+    if (ringtoneRef.current) return;
 
-  const ctx = new AudioContext();
-  ctx.resume();
-  const gain = ctx.createGain();
+    const AudioContext =
+      window.AudioContext || window.webkitAudioContext;
 
-  gain.gain.value = 0.12;
-  gain.connect(ctx.destination);
+    if (!AudioContext) return;
 
-  const ring = () => {
-    const osc1 = ctx.createOscillator();
-    const osc2 = ctx.createOscillator();
+    const ctx = new AudioContext();
+    ctx.resume();
 
-    osc1.frequency.value = 700;
-    osc2.frequency.value = 900;
+    const gain = ctx.createGain();
 
-    osc1.connect(gain);
-    osc2.connect(gain);
+    gain.gain.value = 0.12;
+    gain.connect(ctx.destination);
 
-    osc1.start();
-    osc2.start();
+    const ring = () => {
+      const osc1 = ctx.createOscillator();
+      const osc2 = ctx.createOscillator();
 
-    osc1.stop(ctx.currentTime + 0.35);
-    osc2.stop(ctx.currentTime + 0.35);
+      osc1.frequency.value = 700;
+      osc2.frequency.value = 900;
+
+      osc1.connect(gain);
+      osc2.connect(gain);
+
+      osc1.start();
+      osc2.start();
+
+      osc1.stop(ctx.currentTime + 0.35);
+      osc2.stop(ctx.currentTime + 0.35);
+    };
+
+    ring();
+
+    const timer = setInterval(ring, 1200);
+
+    ringtoneRef.current = {
+      ctx,
+      gain,
+      timer,
+    };
   };
 
-  ring();
+  const stopRingtone = () => {
+    if (!ringtoneRef.current) return;
 
-  const timer = setInterval(ring, 1200);
+    clearInterval(ringtoneRef.current.timer);
+    ringtoneRef.current.ctx.close();
 
-  ringtoneRef.current = { ctx, gain, timer };
-};
+    ringtoneRef.current = null;
+  };
 
-const stopRingtone = () => {
-  if (!ringtoneRef.current) return;
+  // =========================
+  // CREATE SOS
+  // =========================
 
-  clearInterval(ringtoneRef.current.timer);
-  ringtoneRef.current.ctx.close();
-
-  ringtoneRef.current = null;
-};
   const trigger = async () => {
     if (busy || ['ACTIVE', 'RESPONDED'].includes(status)) return;
 
@@ -184,6 +275,10 @@ const stopRingtone = () => {
     }
   };
 
+  // =========================
+  // LIVE GPS TRACKING
+  // =========================
+
   const startTracking = (id) => {
     if (!navigator.geolocation) return;
 
@@ -225,19 +320,28 @@ const stopRingtone = () => {
     );
   };
 
+  // =========================
+  // RESOLVE SOS
+  // =========================
+
   const resolve = async () => {
     if (!alert) return;
 
     setBusy(true);
 
     try {
-      const updated = await updateStatus(alert.id, 'RESOLVED');
+      const updated = await updateStatus(
+        alert.id,
+        'RESOLVED'
+      );
 
       setAlert(updated);
       setStatus('RESOLVED');
 
       if (watchRef.current !== null) {
-        navigator.geolocation.clearWatch(watchRef.current);
+        navigator.geolocation.clearWatch(
+          watchRef.current
+        );
       }
 
       watchRef.current = null;
@@ -246,20 +350,36 @@ const stopRingtone = () => {
         'You are marked SAFE. The SOS has been resolved and live location sharing has stopped.'
       );
     } catch (e) {
-      setMessage('Could not resolve the SOS. Please try again.');
+      setMessage(
+        'Could not resolve the SOS. Please try again.'
+      );
     } finally {
       setBusy(false);
     }
   };
 
-  const updateField = (key, value) => {
-    setStudent((s) => ({
-      ...s,
-      [key]: value,
-    }));
-  };
+  // =========================
+  // WAIT FOR PROFILE
+  // =========================
 
-  const sosActive = status === 'ACTIVE' || status === 'RESPONDED';
+  if (studentLoading || !student) {
+    return (
+      <main className="student-shell">
+        <div className="student-container">
+          <div className="notice notice-info">
+            Loading your student profile...
+          </div>
+        </div>
+      </main>
+    );
+  }
+
+  const sosActive = [
+    'ACTIVE',
+    'ATTENDING',
+    'SAFE',
+    'RESPONDED',
+  ].includes(status);
 
   return (
     <main className="student-shell">
@@ -310,11 +430,17 @@ const stopRingtone = () => {
               <AlertTriangle size={46} />
 
               <span>
-                {busy ? 'WAIT' : sosActive ? 'ACTIVE' : 'SOS'}
+                {busy
+                  ? 'WAIT'
+                  : sosActive
+                  ? 'ACTIVE'
+                  : 'SOS'}
               </span>
 
               <small>
-                {sosActive ? 'Emergency Active' : 'Emergency'}
+                {sosActive
+                  ? 'Emergency Active'
+                  : 'Emergency'}
               </small>
             </div>
           </button>
@@ -333,13 +459,19 @@ const stopRingtone = () => {
           </div>
         )}
 
+        {/* =========================
+            STUDENT PROFILE
+        ========================= */}
+
         <section className="profile-card">
           <div className="section-title">
             <UserRound size={18} />
 
             <div>
               <b>Student profile</b>
-              <span>Used to identify your emergency alert</span>
+              <span>
+                Used to identify your emergency alert
+              </span>
             </div>
           </div>
 
@@ -355,16 +487,17 @@ const stopRingtone = () => {
                 {label}
 
                 <input
-                  value={student[key]}
-                  onChange={(e) =>
-                    updateField(key, e.target.value)
-                  }
-                  disabled={sosActive}
+                  value={student[key] || ''}
+                  readOnly
                 />
               </label>
             ))}
           </div>
         </section>
+
+        {/* =========================
+            STATUS
+        ========================= */}
 
         <section className="status-card">
 
@@ -373,7 +506,9 @@ const stopRingtone = () => {
 
             <div>
               <b>Emergency status</b>
-              <span>Current SOS and location state</span>
+              <span>
+                Current SOS and location state
+              </span>
             </div>
           </div>
 
@@ -395,7 +530,9 @@ const stopRingtone = () => {
               <small>GPS</small>
 
               <strong>
-                {location ? 'Location available' : 'Waiting'}
+                {location
+                  ? 'Location available'
+                  : 'Waiting'}
               </strong>
             </div>
 
@@ -438,7 +575,9 @@ const stopRingtone = () => {
             >
               <CheckCircle size={22} />
 
-              {busy ? 'PLEASE WAIT...' : 'I AM SAFE'}
+              {busy
+                ? 'PLEASE WAIT...'
+                : 'I AM SAFE'}
             </button>
           )}
 
@@ -455,6 +594,10 @@ const stopRingtone = () => {
               </span>
             </a>
           )}
+
+          {/* =========================
+              FAKE CAMPUS CALL
+          ========================= */}
 
           <button
             type="button"
@@ -488,6 +631,10 @@ const stopRingtone = () => {
 
       </div>
 
+      {/* =========================
+          FAKE CALL SCREEN
+      ========================= */}
+
       {fakeCall && (
         <div
           style={{
@@ -506,6 +653,7 @@ const stopRingtone = () => {
           }}
         >
           <div style={{ textAlign: 'center' }}>
+
             <div
               style={{
                 fontSize: '15px',
@@ -513,7 +661,9 @@ const stopRingtone = () => {
                 marginBottom: '28px',
               }}
             >
-              {callConnected ? 'CALL IN PROGRESS' : 'INCOMING CALL'}
+              {callConnected
+                ? 'CALL IN PROGRESS'
+                : 'INCOMING CALL'}
             </div>
 
             <div
@@ -526,7 +676,8 @@ const stopRingtone = () => {
                 alignItems: 'center',
                 justifyContent: 'center',
                 margin: '0 auto 22px',
-                boxShadow: '0 0 0 8px rgba(255,255,255,0.06)',
+                boxShadow:
+                  '0 0 0 8px rgba(255,255,255,0.06)',
               }}
             >
               <Shield size={52} />
@@ -552,6 +703,7 @@ const stopRingtone = () => {
                 ? 'Connected · Demo Call'
                 : 'Mobile · Demo Call'}
             </div>
+
           </div>
 
           {!callConnected ? (
@@ -564,6 +716,7 @@ const stopRingtone = () => {
                 alignItems: 'center',
               }}
             >
+
               <div style={{ textAlign: 'center' }}>
                 <button
                   type="button"
@@ -585,7 +738,12 @@ const stopRingtone = () => {
                   <PhoneOff size={30} />
                 </button>
 
-                <span style={{ fontSize: '14px', opacity: 0.8 }}>
+                <span
+                  style={{
+                    fontSize: '14px',
+                    opacity: 0.8,
+                  }}
+                >
                   Decline
                 </span>
               </div>
@@ -611,13 +769,20 @@ const stopRingtone = () => {
                   <PhoneCall size={30} />
                 </button>
 
-                <span style={{ fontSize: '14px', opacity: 0.8 }}>
+                <span
+                  style={{
+                    fontSize: '14px',
+                    opacity: 0.8,
+                  }}
+                >
                   Accept
                 </span>
               </div>
+
             </div>
           ) : (
             <div style={{ textAlign: 'center' }}>
+
               <div
                 style={{
                   fontSize: '16px',
@@ -635,8 +800,10 @@ const stopRingtone = () => {
                   width: '58px',
                   height: '58px',
                   borderRadius: '50%',
-                  border: '1px solid rgba(255,255,255,0.3)',
-                  background: 'rgba(255,255,255,0.1)',
+                  border:
+                    '1px solid rgba(255,255,255,0.3)',
+                  background:
+                    'rgba(255,255,255,0.1)',
                   color: 'white',
                   display: 'flex',
                   alignItems: 'center',
@@ -645,11 +812,20 @@ const stopRingtone = () => {
                   cursor: 'pointer',
                 }}
               >
-                {callMuted ? <VolumeX /> : <Volume2 />}
+                {callMuted
+                  ? <VolumeX />
+                  : <Volume2 />}
               </button>
 
-              <div style={{ fontSize: '14px', opacity: 0.8 }}>
-                {callMuted ? 'Muted' : 'Speaker'}
+              <div
+                style={{
+                  fontSize: '14px',
+                  opacity: 0.8,
+                }}
+              >
+                {callMuted
+                  ? 'Muted'
+                  : 'Speaker'}
               </div>
 
               <button
@@ -672,9 +848,15 @@ const stopRingtone = () => {
                 <PhoneOff size={30} />
               </button>
 
-              <div style={{ marginTop: '10px', fontSize: '14px' }}>
+              <div
+                style={{
+                  marginTop: '10px',
+                  fontSize: '14px',
+                }}
+              >
                 End call
               </div>
+
             </div>
           )}
         </div>

@@ -13,6 +13,7 @@
     "axios": "^1.11.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.542.0",
+    "qrcode.react": "^4.2.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-leaflet": "^5.0.0",

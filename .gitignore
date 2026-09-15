@@ -6,3 +6,4 @@ server/data/*.json
 server/serviceAccountKey.json
 dist/
 .DS_Store
+serviceAccountKey.json

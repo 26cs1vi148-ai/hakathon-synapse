@@ -1,18 +1,27 @@
-import admin from 'firebase-admin';
+import { initializeApp, getApps, cert } from 'firebase-admin/app';
+import { getFirestore as adminFirestore } from 'firebase-admin/firestore';
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
 
-export function getFirestore() {
-  if (!admin.apps.length) {
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
-    if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_CLIENT_EMAIL || !privateKey) {
-      throw new Error('Firebase credentials are missing.');
-    }
-    admin.initializeApp({
-      credential: admin.credential.cert({
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        privateKey
-      })
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+const serviceAccount = JSON.parse(
+  readFileSync(
+    join(__dirname, '../../serviceAccountKey.json'),
+    'utf8'
+  )
+);
+
+function ensureInitialized() {
+  if (!getApps().length) {
+    initializeApp({
+      credential: cert(serviceAccount),
     });
   }
-  return admin.firestore();
+}
+
+export function getFirestore() {
+  ensureInitialized();
+  return adminFirestore();
 }

@@ -4,20 +4,14 @@ import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import sosRoutes from './routes/sosRoutes.js';
+import studentRoutes from './routes/studentRoutes.js';
 
 const app = express();
 
 app.use(helmet());
 
-const allowedOrigins = process.env.CLIENT_URL
-  ? process.env.CLIENT_URL.split(',').map((x) => x.trim())
-  : [
-      'http://localhost:5173',
-      'http://127.0.0.1:5173',
-    ];
-
 app.use(cors({
-  origin: allowedOrigins,
+  origin: true,
 }));
 
 app.use(express.json({ limit: '32kb' }));
@@ -37,6 +31,34 @@ app.get('/api/health', (req, res) =>
 );
 
 app.use('/api/sos', sosRoutes);
+// ── Connected Students (in-memory heartbeat) ──────────────
+const connectedStudents = new Map();
+const HEARTBEAT_TTL = 90_000; // 90 s — offline if no ping
+
+app.post('/api/students/heartbeat', (req, res) => {
+  const { studentId, name, hostel, room, phone } = req.body;
+  if (!studentId)
+    return res.status(400).json({ message: 'studentId required' });
+
+  connectedStudents.set(studentId, {
+    studentId, name, hostel, room, phone,
+    lastSeen: Date.now(),
+  });
+  res.json({ ok: true });
+});
+
+app.get('/api/students', (req, res) => {
+  const now = Date.now();
+  const online = [];
+  for (const [id, s] of connectedStudents.entries()) {
+    if (now - s.lastSeen < HEARTBEAT_TTL) online.push(s);
+    else connectedStudents.delete(id);  // cleanup stale
+  }
+  res.json(online);
+});
+// ──────────────────────────────────────────────────────────
+app.use('/api/students', studentRoutes);
+
 
 app.use((err, req, res, next) => {
   console.error(err);
