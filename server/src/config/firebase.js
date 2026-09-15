@@ -6,12 +6,14 @@ import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-const serviceAccount = JSON.parse(
-  readFileSync(
-    join(__dirname, '../../serviceAccountKey.json'),
-    'utf8'
-  )
-);
+const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+  ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+  : JSON.parse(
+      readFileSync(
+        join(__dirname, '../../serviceAccountKey.json'),
+        'utf8'
+      )
+    );
 
 function ensureInitialized() {
   if (!getApps().length) {
