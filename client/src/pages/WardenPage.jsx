@@ -17,7 +17,7 @@ import {
   getStudents
 } from '../services/api';
 
-import { subscribeToSosEvents } from '../services/realtime';
+import { subscribeToSosEvents } from '../services/RealTime';
 import { auth } from '../services/firebase';
 import { signOut } from 'firebase/auth';
 import { QRCodeSVG } from 'qrcode.react';
