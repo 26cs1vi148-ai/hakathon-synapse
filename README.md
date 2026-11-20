@@ -52,10 +52,9 @@ The project runs without Firebase credentials in `local` mode, which is useful f
 npm run dev
 ```
 
-- Student: http://localhost:5173/
-- Security: http://localhost:5173/security
-- Demo: http://localhost:5173/demo
-- API health: http://localhost:5000/api/health
+- Student DASHBOARD: https://hakathon-synapse.vercel.app/student-login
+- WARDEN DASHBOARD: https://hakathon-synapse.vercel.app/warden-login
+- Demo: https://hakathon-synapse.vercel.app/demo
 
 ## Firebase production mode
 
