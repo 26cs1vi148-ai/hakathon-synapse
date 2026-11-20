@@ -53,7 +53,7 @@ npm run dev
 ```
 
 - Student Dashoard: https://hakathon-synapse.vercel.app/student-login
-- warden dashoard: https://hakathon-synapse.vercel.app/warden-login
+- warden dashboard: https://hakathon-synapse.vercel.app/warden-login
 - Demo: https://hakathon-synapse.vercel.app/demo
 
 ## Firebase production mode
