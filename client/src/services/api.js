@@ -164,3 +164,10 @@ export const registerHeartbeat = (student) => {
     body: JSON.stringify(student),
   }).then(r => r.json());
 };
+export const getAllStudents = async () => {
+  const token = await auth.currentUser.getIdToken();
+  const r = await api.get('/students/all', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return Array.isArray(r.data) ? r.data : [];
+};

@@ -14,7 +14,8 @@ import {
   getAlerts,
   updateStatus,
   createStudentInvite,
-  getStudents
+  getStudents,
+  getAllStudents
 } from '../services/api';
 
 import { subscribeToSosEvents } from '../services/RealTime';
@@ -25,6 +26,10 @@ import { QRCodeSVG } from 'qrcode.react';
 export default function WardenPage() {
   const [alerts, setAlerts] = useState([]);
   const [students, setStudents] = useState([]);
+  const [allStudents, setAllStudents] = useState([]);
+useEffect(() => {
+  getAllStudents().then(setAllStudents).catch(() => setAllStudents([]));
+}, []);
   const [selectedStudentId, setSelectedStudentId] = useState('ALL');
 
   const [studentsLoading, setStudentsLoading] = useState(true);
@@ -1174,6 +1179,21 @@ export default function WardenPage() {
             </>
           )}
         </section>
+        <section style={{ background:'#fff', border:'1px solid #dbeafe', borderRadius:14, padding:18, marginBottom:22 }}>
+  <h2 style={{ margin:'0 0 12px', fontSize:19 }}>
+    All Students ({allStudents.length})
+  </h2>
+  <select defaultValue="" style={{ width:'100%', padding:'13px 14px', borderRadius:10, border:'1px solid #cbd5e1', background:'#f8fafc', fontSize:15, fontWeight:600 }}>
+    <option value="" disabled>
+      {allStudents.length ? 'View all students' : 'No students yet'}
+    </option>
+    {allStudents.map((s) => (
+      <option key={s.studentId || s.id || s.uid} value={s.studentId || s.id || s.uid}>
+        {s.name || 'Unnamed Student'}
+      </option>
+    ))}
+  </select>
+</section>
 
         {/* =========================
             ERROR

@@ -44,7 +44,7 @@ router.post(
   requireAuth,
   registerStudent
 );
-
+router.get('/all', requireAuth, listStudents);
 /*
  * Warden gets students connected to them.
  */
